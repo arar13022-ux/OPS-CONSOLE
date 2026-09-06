@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ops Console — Team Performance Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg:#0F1420;
+    --panel:#161C2C;
+    --panel-alt:#1B2338;
+    --border:#2A3350;
+    --text:#E7EAF2;
+    --text-dim:#8B93AC;
+    --text-faint:#5B6382;
+    --cyan:#4CC9F0;
+    --amber:#F2A93B;
+    --coral:#F2545B;
+    --green:#3DD68C;
+    --violet:#9C7CF4;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;}
+  h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;margin:0 0 4px 0;font-weight:600;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:var(--cyan);}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  #app{display:flex;min-height:100vh;}
+
+  /* SIDEBAR */
+  #sidebar{width:224px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 0;}
+  .brand{padding:0 20px 18px 20px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+  .brand .mark{display:flex;align-items:center;gap:9px;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+  .brand h1{font-size:16px;letter-spacing:0.2px;}
+  .brand p{margin:2px 0 0 0;color:var(--text-faint);font-size:11.5px;}
+  nav{display:flex;flex-direction:column;padding:6px 10px;gap:2px;}
+  nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:6px;color:var(--text-dim);font-size:13px;display:flex;align-items:center;gap:10px;border-left:2px solid transparent;}
+  nav button:hover{background:var(--panel-alt);color:var(--text);}
+  nav button.active{background:var(--panel-alt);color:var(--text);border-left:2px solid var(--cyan);font-weight:500;}
+  nav .grp{color:var(--text-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;padding:14px 12px 4px 12px;}
+  .icon{width:15px;text-align:center;opacity:.85;font-size:13px;}
+
+  /* MAIN */
+  #main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  #topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 26px;border-bottom:1px solid var(--border);background:#111726;gap:16px;flex-wrap:wrap;}
+  .topbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  select, input[type=text], input[type=date], input[type=number], textarea{
+    background:var(--panel-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:7px 10px;font-family:'Inter',sans-serif;font-size:13px;
+  }
+  textarea{font-family:'IBM Plex Mono',monospace;font-size:12px;width:100%;}
+  .btn{all:unset;cursor:pointer;background:var(--cyan);color:#08151E;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:6px;letter-spacing:.01em;}
+  .btn:hover{filter:brightness(1.08);}
+  .btn.secondary{background:transparent;border:1px solid var(--border);color:var(--text);}
+  .btn.danger{background:var(--coral);color:#2B0A0C;}
+  .btn.ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+  .pill{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600;letter-spacing:.02em;}
+  .pill.green{background:rgba(61,214,140,.14);color:var(--green);}
+  .pill.amber{background:rgba(242,169,59,.14);color:var(--amber);}
+  .pill.coral{background:rgba(242,84,91,.14);color:var(--coral);}
+  .pill.violet{background:rgba(156,124,244,.14);color:var(--violet);}
+  .pill.dim{background:rgba(139,147,172,.14);color:var(--text-dim);}
+
+  #content{padding:24px 26px 60px 26px;overflow-y:auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .grid{display:grid;gap:16px;}
+  .g4{grid-template-columns:repeat(4,1fr);}
+  .g3{grid-template-columns:repeat(3,1fr);}
+  .g2{grid-template-columns:2fr 1fr;}
+  @media(max-width:1100px){.g4{grid-template-columns:repeat(2,1fr);} .g3{grid-template-columns:repeat(1,1fr);} .g2{grid-template-columns:1fr;}}
+
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:18px 20px;}
+  .card h3{font-size:12.5px;color:var(--text-dim);text-transform:none;letter-spacing:.01em;font-weight:500;margin-bottom:10px;}
+  .kpi .big{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;}
+  .kpi .sub{color:var(--text-faint);font-size:12px;margin-top:4px;}
+  .kpi .delta{font-size:12px;margin-top:6px;}
+  .kpi .delta.good{color:var(--green);} .kpi .delta.bad{color:var(--coral);}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--text-faint);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:9px 10px;border-bottom:1px solid #1E263C;white-space:nowrap;}
+  tr.row-link{cursor:pointer;}
+  tr.row-link:hover td{background:var(--panel-alt);}
+  .name-cell{display:flex;align-items:center;gap:9px;}
+  .flagbar{width:3px;height:16px;border-radius:2px;display:inline-block;}
+  .scorebar{width:60px;height:6px;background:#232B44;border-radius:3px;overflow:hidden;display:inline-block;vertical-align:middle;margin-right:8px;}
+  .scorebar > div{height:100%;}
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .section-title h2{font-size:18px;}
+  .section-title p{color:var(--text-faint);font-size:12.5px;margin:2px 0 0 0;}
+  .divider{height:1px;background:var(--border);margin:22px 0;}
+  .empty{color:var(--text-faint);font-size:13px;padding:30px;text-align:center;border:1px dashed var(--border);border-radius:8px;}
+  .insight-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #1E263C;align-items:flex-start;}
+  .insight-row:last-child{border-bottom:none;}
+  .badge-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+  label.field{display:block;font-size:12px;color:var(--text-dim);margin-bottom:5px;}
+  .field-row{margin-bottom:14px;}
+  .weight-total{font-size:12px;margin-top:6px;}
+  .coach-card{border-left:3px solid var(--border);background:var(--panel-alt);border-radius:6px;padding:12px 14px;margin-bottom:10px;}
+  .agent-header{display:flex;align-items:center;gap:16px;margin-bottom:18px;}
+  .avatar{width:48px;height:48px;border-radius:8px;background:var(--panel-alt);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk';font-weight:600;font-size:17px;color:var(--cyan);}
+  .backlink{color:var(--text-dim);font-size:12.5px;cursor:pointer;margin-bottom:14px;display:inline-block;}
+  .backlink:hover{color:var(--text);}
+  .metric-line{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #1E263C;font-size:13px;}
+  .metric-line:last-child{border-bottom:none;}
+  .metric-line .val{font-family:'IBM Plex Mono',monospace;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;}
+  .exec-block{background:var(--panel-alt);border:1px solid var(--border);border-radius:8px;padding:22px;font-size:14px;line-height:1.7;}
+  .exec-block h4{font-size:13px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 8px 0;}
+  .exec-block h4:first-child{margin-top:0;}
+  .loading{color:var(--text-faint);padding:40px;text-align:center;}
+  .filter-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .filter-bar button{all:unset;cursor:pointer;padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid var(--border);color:var(--text-dim);}
+  .filter-bar button.on{background:var(--cyan);color:#08151E;border-color:var(--cyan);font-weight:600;}
+
+  /* Session data export/import — additive, discreet, matches existing tokens */
+  #ioFab{position:fixed;bottom:18px;right:18px;width:34px;height:34px;border-radius:50%;
+    background:var(--panel-alt);border:1px solid var(--border);color:var(--text-faint);
+    font-size:15px;cursor:pointer;z-index:500;display:flex;align-items:center;justify-content:center;
+    opacity:.55;transition:opacity .15s;}
+  #ioFab:hover{opacity:1;color:var(--text);}
+  #ioPanel{display:none;position:fixed;bottom:60px;right:18px;width:320px;max-width:calc(100vw - 36px);
+    background:var(--panel);border:1px solid var(--border);border-radius:8px;z-index:501;
+    box-shadow:0 8px 28px rgba(0,0,0,.45);}
+  #ioPanel.open{display:block;}
+  #ioPanel .io-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;
+    border-bottom:1px solid var(--border);font-size:12.5px;color:var(--text-dim);font-weight:600;}
+  #ioPanel .io-head button{all:unset;cursor:pointer;color:var(--text-faint);font-size:12px;padding:2px 4px;}
+  #ioPanel .io-body{padding:12px 14px;max-height:70vh;overflow-y:auto;}
+  #ioPanel .io-hint{color:var(--text-faint);font-size:11.5px;margin:0 0 12px 0;line-height:1.4;}
+  #ioPanel .io-section{margin-bottom:14px;}
+  #ioPanel .io-section:last-child{margin-bottom:0;}
+  #ioPanel h4{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px 0;}
+  #ioPanel textarea{width:100%;margin-top:8px;font-size:11px;resize:vertical;}
+  #ioPanel input[type=file]{width:100%;font-size:11.5px;color:var(--text-dim);}
+  #ioPanel .btn{margin-right:6px;margin-bottom:6px;}
+  #ioMsg{font-size:11.5px;margin-top:4px;color:var(--text-faint);}
+
+  /* Authentication overlay — additive, uses the same design tokens as the rest of the app */
+  #authOverlay{position:fixed;inset:0;background:var(--bg);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;}
+  #authOverlay.hidden{display:none;}
+  .auth-box{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:32px 30px 24px 30px;}
+  .auth-footer{margin-top:24px;padding-top:16px;border-top:1px solid var(--border);text-align:center;color:var(--text-faint);font-size:11px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div class="brand">
+      <div class="mark"><span class="dot"></span><h1>Ops Console</h1></div>
+      <p>Team performance &amp; coaching platform</p>
+      <p style="margin-top:6px;color:var(--text-faint);font-size:11px">Built by Abdullah Hany</p>
+    </div>
+    <div class="grp">Overview</div>
+    <nav>
+      <button data-view="home" class="active"><span class="icon">◆</span>Home Dashboard</button>
+      <button data-view="import"><span class="icon">⇧</span>Weekly Data Import</button>
+    </nav>
+    <div class="grp">Team</div>
+    <nav>
+      <button data-view="team"><span class="icon">▤</span>Team Dashboard</button>
+      <button data-view="score"><span class="icon">◎</span>Performance Score</button>
+      <button data-view="insights"><span class="icon">✦</span>Team Insights</button>
+    </nav>
+    <div class="grp">Act</div>
+    <nav>
+      <button data-view="coaching"><span class="icon">✎</span>Coaching Engine</button>
+      <button data-view="coach1on1"><span class="icon">◒</span>1:1 Coaching Workspace</button>
+      <button data-view="actions"><span class="icon">⚑</span>Action Center</button>
+      <button data-view="exec"><span class="icon">▣</span>Executive Summary</button>
+    </nav>
+    <div class="grp">Configure</div>
+    <nav>
+      <button data-view="settings"><span class="icon">⚙</span>Settings</button>
+      <button data-view="users" id="navUsers"><span class="icon">☺</span>User Management</button>
+    </nav>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <div class="topbar-left">
+        <select id="teamSelect"></select>
+        <button class="btn ghost" id="addTeamBtn">+ Team</button>
+        <select id="weekSelect"></select>
+      </div>
+      <div class="topbar-left">
+        <span id="dataStatus" class="pill dim">loading…</span>
+        <button class="btn secondary" id="gotoImportBtn">Import week</button>
+        <span id="authBadge" class="pill dim" style="display:none"></span>
+        <button class="btn ghost" id="signOutBtn" style="display:none">Sign out</button>
+      </div>
+    </div>
+    <div id="content"><div class="loading">Loading console…</div></div>
+  </div>
+</div>
+
+<!-- ================= Authentication (login gate + session) =================
+     Sits on top of the existing app via a full-screen overlay. Does not
+     alter #app/#sidebar/#topbar/#content markup or any existing view. -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <div class="mark" style="justify-content:center;margin-bottom:18px"><span class="dot"></span><h1>Ops Console</h1></div>
+    <h2 style="text-align:center;font-size:22px">Welcome back!</h2>
+    <p style="text-align:center;color:var(--text-faint);font-size:13px;margin:6px 0 22px 0">Empower your team with smarter coaching, meaningful insights, and data-driven decisions.</p>
+    <div class="field-row"><label class="field">Username</label><input type="text" id="authUser" autocomplete="username"></div>
+    <div class="field-row"><label class="field">Password</label><input type="password" id="authPass" autocomplete="current-password"></div>
+    <button class="btn" id="authSubmit" style="width:100%">Sign in</button>
+    <div id="authErr" style="color:var(--coral);font-size:12.5px;margin-top:10px;min-height:16px"></div>
+    <div class="auth-footer">
+      <div>Designed &amp; Developed by Abdullah Hany</div>
+      <div>©2026 All Rights Reserved</div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= Session state export/import (discreet, floating) =================
+     Purely additive: a small fixed-position control for moving saved data between
+     browsers/devices, since the storage layer above is local to one browser.
+     Does not touch #app, #sidebar, #topbar, #content or any existing view markup. -->
+<button id="ioFab" title="Export / Import data" aria-label="Export or import console data">⇅</button>
+<div id="ioPanel">
+  <div class="io-head">
+    <span>Session data</span>
+    <button id="ioClose" aria-label="Close">✕</button>
+  </div>
+  <div class="io-body">
+    <p class="io-hint">Data is saved to this browser only. Use this to move it to another browser or device.</p>
+    <div class="io-section">
+      <h4>Export</h4>
+      <button class="btn secondary" id="ioDownloadBtn">Download JSON file</button>
+      <button class="btn ghost" id="ioCopyBtn">Copy as text</button>
+      <textarea id="ioExportText" readonly rows="4" placeholder="Click Export to generate…"></textarea>
+    </div>
+    <div class="io-section">
+      <h4>Import</h4>
+      <input type="file" id="ioFileInput" accept="application/json">
+      <textarea id="ioImportText" rows="4" placeholder="…or paste a previously exported code here"></textarea>
+      <button class="btn" id="ioRestoreBtn">Restore this data</button>
+      <div id="ioMsg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================= REMOTE BACKEND (optional) ============================= */
+/* Leave this blank to keep using this browser's local storage, exactly as
+   before. Paste your deployed Apps Script Web App URL (ends in /exec) here
+   to make that Google Sheet the real shared backend instead — every
+   browser/device pointed at the same URL then sees the same live data. */
+const REMOTE_API_URL = '';
+let sessionToken = null;
+
+/* ============================= STORAGE HELPERS ============================= */
+/* Prefers a configured remote API (see REMOTE_API_URL above). Otherwise
+   prefers window.storage (available when rendered inside Claude's artifact
+   viewer). Falls back to localStorage (works when this file is opened
+   directly in a browser). Falls back further to an in-memory object so the
+   app never shows empty just because a storage layer is unavailable — worst
+   case, data only lasts for the current tab session. */
+const _mem = {};
+let _storageMode = null;
+async function _detectStorage(){
+  if(_storageMode) return _storageMode;
+  if(REMOTE_API_URL){ _storageMode = 'remote'; return _storageMode; }
+  try{
+    if(window.storage && typeof window.storage.set === 'function'){
+      await window.storage.set('__probe__','1',false);
+      const r = await window.storage.get('__probe__',false);
+      if(r && r.value === '1'){ _storageMode = 'artifact'; return _storageMode; }
+    }
+  }catch(e){}
+  try{
+    localStorage.setItem('__probe__','1');
+    if(localStorage.getItem('__probe__')==='1'){ _storageMode = 'local'; return _storageMode; }
+  }catch(e){}
+  _storageMode = 'memory';
+  return _storageMode;
+}
+async function sget(key){
+  const mode = await _detectStorage();
+  if(mode==='remote'){
+    try{
+      const url = REMOTE_API_URL+'?action=get&key='+encodeURIComponent(key)+'&token='+encodeURIComponent(sessionToken||'');
+      const res = await fetch(url);
+      const data = await res.json();
+      return data.ok ? data.value : null;
+    }catch(e){ console.error('remote get failed', key, e); return null; }
+  }
+  try{
+    if(mode==='artifact'){ const r = await window.storage.get(key,false); return r? JSON.parse(r.value) : null; }
+    if(mode==='local'){ const raw = localStorage.getItem('opsconsole:'+key); return raw? JSON.parse(raw) : null; }
+  }catch(e){ console.error('storage get failed, falling back to memory', key, e); }
+  return _mem[key] !== undefined ? _mem[key] : null;
+}
+async function sset(key,val){
+  _mem[key] = val;
+  const mode = await _detectStorage();
+  if(mode==='remote'){
+    try{
+      const res = await fetch(REMOTE_API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action:'set', key, value:val, token:sessionToken }) });
+      const data = await res.json();
+      return !!data.ok;
+    }catch(e){ console.error('remote set failed', key, e); return false; }
+  }
+  try{
+    if(mode==='artifact'){ await window.storage.set(key, JSON.stringify(val), false); return true; }
+    if(mode==='local'){ localStorage.setItem('opsconsole:'+key, JSON.stringify(val)); return true; }
+  }catch(e){ console.error('storage set failed, kept in memory only', key, e); }
+  return mode==='memory';
+}
+
+/* ============================= CONSTANTS / DEFAULTS ============================= */
+const DEFAULT_TARGETS = { aht:570, hold:120, acw:20, noCase:0, fcr:12, ghostWarn:20 };
+const DEFAULT_WEIGHTS = { csat:30, aht:20, hold:15, acw:15, noCase:10, ghost:10 };
+
+/* ============================= AUTH: crypto + storage ============================= */
+/* IMPORTANT SCOPE NOTE: this is a client-side-only file with no backend server.
+   Passwords are salted+hashed (not stored in plain text) and access is gated
+   by role, but none of this is enforced by a server — it's a genuine access
+   layer for normal use, not a substitute for real server-side authentication.
+   Anyone with browser dev tools open on this page can still inspect storage
+   or call internal functions directly. */
+const INACTIVITY_MS = 15*60*1000; // auto-logout after 15 minutes of no activity
+let authSession = null; // { username, role, team } — memory-only, never persisted
+let _lastActivityAt = Date.now();
+
+async function sha256Hex(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function randomSalt(){
+  return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function hashPassword(password, salt){ return sha256Hex(salt+':'+password); }
+
+async function getUsers(){ return await sget('auth:users') || []; }
+async function saveUsers(list){ await sset('auth:users', list); }
+async function getAuditLog(){ return await sget('auth:auditlog') || []; }
+async function logAudit(action, actor, details){
+  const log = await getAuditLog();
+  log.push({ ts:new Date().toISOString(), actor, action, details:details||'' });
+  while(log.length>500) log.shift();
+  await sset('auth:auditlog', log);
+}
+/* Hardcoded seed accounts. SEED_VERSION forces a one-time reset of all users
+   and passwords to exactly this list, in whichever storage mode is active
+   (local browser storage, or the remote Sheet), the next time this file is
+   loaded or a remote login is attempted — bump SEED_VERSION again later if
+   you ever want to force another full reset from the code itself. */
+const SEED_VERSION = 2;
+const SEED_USERS = [
+  { username:'Diezel', password:'15-8-2005', role:'Admin', team:null },
+  { username:'Asmo2a', password:'5-10-2000', role:'Admin', team:null },
+];
+async function ensureSeedAdmin(){
+  const seededVersion = await sget('auth:seedVersion');
+  if(seededVersion === SEED_VERSION) return;
+  const users = [];
+  for(const su of SEED_USERS){
+    const salt = randomSalt();
+    const hash = await hashPassword(su.password, salt);
+    users.push({ username:su.username, salt, hash, role:su.role, team:su.team, active:true, createdAt:new Date().toISOString().slice(0,10), lastLogin:null });
+  }
+  await saveUsers(users);
+  await sset('auth:seedVersion', SEED_VERSION);
+  await logAudit('system_reset', 'system', `all users reset to seed v${SEED_VERSION}`);
+}
+
+async function doLogin(username, password){
+  const mode = await _detectStorage();
+  if(mode==='remote'){
+    try{
+      const res = await fetch(REMOTE_API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({ action:'login', username, password }) });
+      const data = await res.json();
+      if(!data.ok) return data.error || 'Incorrect username or password.';
+      sessionToken = data.token;
+      authSession = { username:data.username, role:data.role, team:data.team };
+      _lastActivityAt = Date.now();
+      return null;
+    }catch(e){ return 'Could not reach the server — check your connection and the configured API URL.'; }
+  }
+  const users = await getUsers();
+  const u = users.find(x=>x.username.toLowerCase()===username.trim().toLowerCase());
+  if(!u) return 'Incorrect username or password.';
+  if(!u.active) return 'This account has been deactivated. Contact an admin.';
+  const hash = await hashPassword(password, u.salt);
+  if(hash!==u.hash) return 'Incorrect username or password.';
+  u.lastLogin = new Date().toISOString();
+  await saveUsers(users);
+  authSession = { username:u.username, role:u.role, team:u.team };
+  _lastActivityAt = Date.now();
+  await logAudit('login', u.username, `role=${u.role}`);
+  return null; // success
+}
+async function doLogout(reason){
+  const mode = await _detectStorage();
+  if(mode==='remote' && sessionToken){
+    try{ await fetch(REMOTE_API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ action:'logout', token:sessionToken, reason:reason||'manual' }) }); }catch(e){}
+  } else if(authSession){
+    await logAudit('logout', authSession.username, reason||'manual');
+  }
+  sessionToken = null;
+  authSession = null;
+  document.getElementById('authOverlay').classList.remove('hidden');
+  document.getElementById('authPass').value = '';
+  document.getElementById('authErr').textContent = '';
+}
+function markActivity(){ _lastActivityAt = Date.now(); }
+setInterval(()=>{
+  if(authSession && Date.now()-_lastActivityAt > INACTIVITY_MS) doLogout('inactivity timeout');
+}, 30000);
+['mousemove','keydown','click','scroll','touchstart'].forEach(evt=>{
+  document.addEventListener(evt, markActivity, {passive:true});
+});
+
+function applyRoleRestrictions(){
+  if(!authSession) return;
+  const isAdmin = authSession.role==='Admin';
+  const isTL = authSession.role==='Team Leader';
+  const navUsers = document.getElementById('navUsers');
+  if(navUsers) navUsers.style.display = isAdmin? '' : 'none';
+  const settingsBtn = document.querySelector('nav button[data-view="settings"]');
+  if(settingsBtn) settingsBtn.style.display = isTL? 'none' : '';
+  const addTeamBtn = document.getElementById('addTeamBtn');
+  const teamSelect = document.getElementById('teamSelect');
+  if(isTL){
+    if(addTeamBtn) addTeamBtn.style.display = 'none';
+    if(teamSelect){ teamSelect.disabled = true; if(authSession.team && state.teams.includes(authSession.team)) teamSelect.value = authSession.team; }
+    if(authSession.team && state.team!==authSession.team && state.teams.includes(authSession.team)){
+      loadTeam(authSession.team).then(()=>{ renderTopbar(); showView('home'); });
+    }
+  } else {
+    if(addTeamBtn) addTeamBtn.style.display = '';
+    if(teamSelect) teamSelect.disabled = false;
+  }
+  const badge = document.getElementById('authBadge');
+  if(badge){ badge.style.display=''; badge.textContent = `${authSession.username} · ${authSession.role}`; }
+  const signOutBtn = document.getElementById('signOutBtn');
+  if(signOutBtn) signOutBtn.style.display = '';
+}
+
+const SAMPLE_AGENTS = [
+["Saja Nour",158,0,542,61,41.77,204,2,64.29,8.81,37,18],
+["Abdullah Mostafa",624,66.67,405,75,53.85,128,0,63.86,13.15,105,15],
+["Fady Assal",483,100,546,35,31.06,240,0,63.46,10.66,76,15],
+["Sameh Sobhy",520,33.33,440,48,60.77,348,4,34.57,31.03,82,43],
+["Nour Alaa",623,66.67,387,16,53.77,180,0,32.43,5.92,20,5],
+["Shahd Bakry",643,100,458,35,71.70,264,1,30.51,9.10,35,5],
+["Mohamed Osama",764,100,312,42,47.12,78,1,28.33,7.80,25,5],
+["Kareem Akram",896,100,383,37,51.12,112,1,25.76,14.55,68,13],
+["Khloud Mohamed",732,null,412,57,67.49,201,0,25.42,8.04,82,53],
+["Azza Adel",694,100,430,50,56.05,268,0,21.67,8.58,76,41],
+["Noura Saber",297,50,465,45,73.40,249,0,12.73,36.67,27,9],
+["Omnia Ewies",826,50,457,73,67.07,217,0,12.71,21.65,42,8],
+["Amr Elgamal",254,null,445,28,46.46,185,0,10.08,46.67,17,4],
+["Emad Abdelqader",201,50,508,23,42.79,158,0,9.09,10.95,10,6],
+["Mayar Aboali",257,50,541,48,82.10,272,4,8.57,13.51,7,2],
+["Abdelrhman Mohammed",1124,100,356,34,48.58,77,1,8.33,13.81,40,13],
+["Omar soliman",146,null,534,50,82.19,246,0,6.25,10.88,3,4],
+["Zeyad Eledeissy",299,100,457,27,57.86,160,1,4.88,13.53,13,8],
+["Mohamed Bahnasy",314,0,431,38,59.87,170,0,3.70,8.54,4,2],
+["Waseem Mohamed",259,100,478,56,39.00,195,0,3.06,37.12,8,1],
+["Jana Amer",121,null,570,36,53.72,173,2,1.52,53.23,10,4],
+["Asmaa Eldokhmesy",181,100,587,40,71.82,262,0,24.31,19.0,19,11]
+].map(r=>({name:r[0],calls:r[1],csat:r[2],aht:r[3],acw:r[4],holdPct:r[5],holdAvg:r[6],noCase:r[7],shortCall:r[8],agentDis:r[9],ghost:r[10],ghost60:r[11]}));
+
+/* ============================= STATE ============================= */
+let state = { team:null, teams:[], weekId:null, weeks:[], agents:[], targets:DEFAULT_TARGETS, weights:DEFAULT_WEIGHTS, actioned:{}, currentAgent:null };
+let charts = {};
+
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function fmtSec(s){ if(s==null) return '—'; s=Math.round(s); const m=Math.floor(s/60), r=s%60; return m+':'+String(r).padStart(2,'0'); }
+function fmtPct(v,d=1){ return v==null? '—' : v.toFixed(d)+'%'; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================= SCORING ============================= */
+function scoreAgent(a, targets, weights){
+  const parts = [];
+  if(a.csat!=null) parts.push(['csat', weights.csat, clamp(a.csat,0,100)]);
+  parts.push(['aht', weights.aht, clamp(targets.aht/a.aht*100,0,100)]);
+  parts.push(['hold', weights.hold, clamp(targets.hold/a.holdAvg*100,0,100)]);
+  parts.push(['acw', weights.acw, clamp(targets.acw/a.acw*100,0,100)]);
+  parts.push(['noCase', weights.noCase, a.noCase>0? Math.max(0,100-a.noCase*25) : 100]);
+  parts.push(['ghost', weights.ghost, clamp(100 - a.ghost60*3, 0, 100)]);
+  const wsum = parts.reduce((s,p)=>s+p[1],0);
+  const score = parts.reduce((s,p)=>s+p[1]*p[2],0)/wsum;
+  const breakdown = {}; parts.forEach(p=>breakdown[p[0]]=Math.round(p[2]));
+  return { overall: Math.round(score), breakdown };
+}
+function scoreColor(s){ return s>=85? 'var(--green)' : s>=65? 'var(--amber)' : 'var(--coral)'; }
+function scorePill(s){ return s>=85? 'green' : s>=65? 'amber' : 'coral'; }
+
+/* ============================= COACHING RULES ============================= */
+function coachingFor(a, targets){
+  const items = [];
+  if(a.csat==null) items.push({priority:'data', text:`No CSAT surveys returned this week — confirm the survey/IVR is reaching this agent's customers before reading their score as zero.`});
+  else if(a.csat<50) items.push({priority:'critical', text:`CSAT at ${a.csat.toFixed(0)}% — pull 3–5 recent calls for a quality review; check tone, ownership and resolution.`});
+  else if(a.csat<75) items.push({priority:'high', text:`CSAT at ${a.csat.toFixed(0)}% sits below team norm — pair with a top-CSAT agent for call calibration.`});
+
+  if(a.aht > targets.aht*1.3) items.push({priority:'critical', text:`AHT of ${fmtSec(a.aht)} is ${Math.round((a.aht/targets.aht-1)*100)}% over target — review the longest calls this week for control and de-escalation technique.`});
+  else if(a.aht > targets.aht*1.05) items.push({priority:'high', text:`AHT of ${fmtSec(a.aht)} is above the ${fmtSec(targets.aht)} target — coach on call structure and closing pace.`});
+
+  if(a.holdAvg > targets.hold*1.5) items.push({priority:'high', text:`Average hold of ${fmtSec(a.holdAvg)} is well above the ${fmtSec(targets.hold)} target — coach on system navigation and proactive hold updates.`});
+
+  if(a.acw > targets.acw*2.5) items.push({priority:'medium', text:`ACW of ${Math.round(a.acw)}s is high relative to target — check whether notes/macros could speed up wrap-up.`});
+
+  if(a.noCase>0) items.push({priority: a.noCase>=3?'critical':'high', text:`${a.noCase} call(s) closed with no case logged — reinforce case-creation SOP; this is a compliance gap.`});
+
+  if(a.agentDis>25) items.push({priority:'critical', text:`Agent-initiated disconnect rate at ${a.agentDis.toFixed(0)}% — urgent review for possible call avoidance or policy breach.`});
+
+  if(a.ghost60>20) items.push({priority:'high', text:`${a.ghost60} ghost calls held over 60 seconds — investigate queue/system behaviour vs. avoidance.`});
+
+  if(a.shortCall>50 && a.csat!=null && a.csat<75) items.push({priority:'medium', text:`Short-call rate at ${a.shortCall.toFixed(0)}% alongside softer CSAT — review recordings for premature call closure.`});
+
+  if(items.length===0) items.push({priority:'good', text:`All monitored metrics are within target this week — a strong candidate for peer mentoring or QA calibration duty.`});
+  return items;
+}
+const PRIORITY_ORDER = {critical:0, high:1, medium:2, data:3, good:4};
+const PRIORITY_COLOR = {critical:'var(--coral)', high:'var(--amber)', medium:'var(--violet)', data:'var(--text-faint)', good:'var(--green)'};
+const PRIORITY_LABEL = {critical:'Critical', high:'High', medium:'Medium', data:'Data gap', good:'On track'};
+
+/* ============================= LOAD / SAVE ============================= */
+async function loadAll(){
+  let teams = await sget('teams');
+  if(!teams){ teams = ['Team A']; await sset('teams', teams); }
+  state.teams = teams;
+  state.team = teams[0];
+  await loadTeam(state.team);
+}
+
+async function loadTeam(team){
+  state.team = team;
+  let weeks = await sget('weeks:'+team);
+  let targets = await sget('targets:'+team);
+  let weights = await sget('weights:'+team);
+  if(!targets){ targets = {...DEFAULT_TARGETS}; await sset('targets:'+team, targets); }
+  if(!weights){ weights = {...DEFAULT_WEIGHTS}; await sset('weights:'+team, weights); }
+  state.targets = targets; state.weights = weights;
+
+  if(!weeks){
+    // seed first team with sample data on very first run
+    const weekId = 'wk_'+Date.now();
+    weeks = [{id:weekId, label:'Week 36 (sample import)', uploadedAt: new Date().toISOString().slice(0,10)}];
+    await sset('weeks:'+team, weeks);
+    await sset('weekdata:'+team+':'+weekId, SAMPLE_AGENTS);
+  }
+  state.weeks = weeks;
+  state.weekId = weeks[weeks.length-1].id;
+  await loadWeekData();
+  let actioned = await sget('actioned:'+team+':'+state.weekId);
+  state.actioned = actioned || {};
+}
+
+async function loadWeekData(){
+  const data = await sget('weekdata:'+state.team+':'+state.weekId);
+  state.agents = data || [];
+}
+
+/* ============================= TOPBAR ============================= */
+function renderTopbar(){
+  const ts = document.getElementById('teamSelect');
+  ts.innerHTML = state.teams.map(t=>`<option value="${esc(t)}" ${t===state.team?'selected':''}>${esc(t)}</option>`).join('');
+  const ws = document.getElementById('weekSelect');
+  ws.innerHTML = state.weeks.map(w=>`<option value="${esc(w.id)}" ${w.id===state.weekId?'selected':''}>${esc(w.label)}</option>`).join('');
+  const status = document.getElementById('dataStatus');
+  const modeLabel = _storageMode==='remote' ? 'live · shared' : _storageMode==='artifact' ? 'saved' : _storageMode==='local' ? 'saved locally' : 'session only';
+  status.textContent = state.agents.length + ' agents · ' + (state.weeks.find(w=>w.id===state.weekId)||{}).uploadedAt + ' · ' + modeLabel;
+  applyRoleRestrictions();
+}
+
+/* ============================= NAV ============================= */
+const VIEWS = ['home','import','team','agent','score','insights','coaching','coach1on1','actions','exec','settings','users'];
+function showView(name){
+  VIEWS.forEach(v=>{
+    const el = document.getElementById('view-'+v);
+    if(el) el.classList.toggle('active', v===name);
+  });
+  document.querySelectorAll('nav button[data-view]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.view===name);
+  });
+  if(name==='home') renderHome();
+  if(name==='team') renderTeam();
+  if(name==='score') renderScore();
+  if(name==='insights') renderInsights();
+  if(name==='coaching') renderCoaching();
+  if(name==='coach1on1') renderCoach1on1();
+  if(name==='actions') renderActions();
+  if(name==='exec') renderExec();
+  if(name==='settings') renderSettings();
+  if(name==='import') renderImport();
+  if(name==='users') renderUserManagement();
+}
+
+/* ============================= AGGREGATES ============================= */
+function computeAggregates(){
+  const a = state.agents, t = state.targets;
+  const n = a.length || 1;
+  const avg = arr => arr.reduce((s,x)=>s+x,0)/(arr.length||1);
+  const csatAgents = a.filter(x=>x.csat!=null);
+  const agg = {
+    totalCalls: a.reduce((s,x)=>s+x.calls,0),
+    avgCsat: csatAgents.length? avg(csatAgents.map(x=>x.csat)) : null,
+    csatMissingCount: a.length - csatAgents.length,
+    avgAht: avg(a.map(x=>x.aht)),
+    ahtMeetPct: 100*a.filter(x=>x.aht<=t.aht).length/n,
+    avgHold: avg(a.map(x=>x.holdAvg)),
+    holdMeetPct: 100*a.filter(x=>x.holdAvg<=t.hold).length/n,
+    avgAcw: avg(a.map(x=>x.acw)),
+    acwMeetPct: 100*a.filter(x=>x.acw<=t.acw).length/n,
+    noCaseAgents: a.filter(x=>x.noCase>0).length,
+    noCaseTotal: a.reduce((s,x)=>s+x.noCase,0),
+    ghost60Total: a.reduce((s,x)=>s+x.ghost60,0),
+    ghostTotal: a.reduce((s,x)=>s+x.ghost,0),
+    highDisAgents: a.filter(x=>x.agentDis>25).length,
+  };
+  agg.scores = a.map(x=>({name:x.name, ...scoreAgent(x,t,state.weights), raw:x}));
+  agg.scores.sort((p,q)=>q.overall-p.overall);
+  agg.teamScore = Math.round(avg(agg.scores.map(s=>s.overall)));
+  return agg;
+}
+
+/* ============================= HOME ============================= */
+function renderHome(){
+  const agg = computeAggregates();
+  const el = document.getElementById('view-home');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  const risk = agg.scores.filter(s=>s.overall<65);
+  const top = agg.scores.slice(0,3);
+  const bottom = agg.scores.slice(-3).reverse();
+  el.innerHTML = `
+    <div class="section-title"><div><h2>Home dashboard</h2><p>${esc(state.team)} · ${esc((state.weeks.find(w=>w.id===state.weekId)||{}).label||'')}</p></div>
+      <span class="pill ${scorePill(agg.teamScore)}">Team score ${agg.teamScore}</span></div>
+    <div class="grid g4">
+      ${kpiCard('Calls handled', agg.totalCalls.toLocaleString(), `${state.agents.length} agents reporting`)}
+      ${kpiCard('Avg CSAT', agg.avgCsat!=null? agg.avgCsat.toFixed(1)+'%' : '—', agg.csatMissingCount? agg.csatMissingCount+' agent(s) with no surveys' : 'all agents surveyed')}
+      ${kpiCard('Avg AHT', fmtSec(agg.avgAht), Math.round(agg.ahtMeetPct)+'% of agents ≤ target ('+fmtSec(state.targets.aht)+')', agg.ahtMeetPct>=70)}
+      ${kpiCard('Avg ACW', Math.round(agg.avgAcw)+'s', Math.round(agg.acwMeetPct)+'% of agents ≤ target ('+state.targets.acw+'s)', agg.acwMeetPct>=70)}
+    </div>
+    <div class="divider"></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Agents needing attention (score below 65)</h3>
+        ${risk.length? risk.map(r=>agentRiskRow(r)).join('') : '<div class="empty">No agents currently below the risk threshold.</div>'}
+      </div>
+      <div class="card">
+        <h3>This week at a glance</h3>
+        <div class="metric-line"><span>No case logged</span><span class="val">${agg.noCaseAgents} agent(s) · ${agg.noCaseTotal} calls</span></div>
+        <div class="metric-line"><span>Ghost calls &gt;60s</span><span class="val">${agg.ghost60Total} total</span></div>
+        <div class="metric-line"><span>High disconnect rate (&gt;25%)</span><span class="val">${agg.highDisAgents} agent(s)</span></div>
+        <div class="metric-line"><span>FCR (7d)</span><span class="val" style="color:var(--text-faint)">not in this import</span></div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="grid g2">
+      <div class="card"><h3>Top performers</h3>${top.map(r=>agentRankRow(r)).join('')}</div>
+      <div class="card"><h3>Lowest scoring this week</h3>${bottom.map(r=>agentRankRow(r)).join('')}</div>
+    </div>
+  `;
+}
+function kpiCard(label,big,sub,good){
+  const cls = good===undefined? '' : (good? 'good':'bad');
+  return `<div class="card kpi"><h3>${label}</h3><div class="big">${big}</div><div class="sub ${cls}">${sub}</div></div>`;
+}
+function agentRiskRow(r){
+  return `<div class="insight-row"><span class="badge-dot" style="background:${scoreColor(r.overall)}"></span>
+    <div style="flex:1"><b>${esc(r.name)}</b><div class="sub" style="color:var(--text-faint);font-size:12px">score ${r.overall} · ${coachingFor(r.raw, state.targets)[0].text}</div></div>
+    <button class="btn secondary" onclick="openAgent('${esc(r.name)}')">View</button></div>`;
+}
+function agentRankRow(r){
+  return `<div class="metric-line"><span>${esc(r.name)}</span><span class="val" style="color:${scoreColor(r.overall)}">${r.overall}</span></div>`;
+}
+function emptyState(){
+  return `<div class="section-title"><h2>Home dashboard</h2></div><div class="empty">No data loaded for this team yet.<br><br><button class="btn" onclick="showView('import')">Import your first week</button></div>`;
+}
+
+/* ============================= TEAM DASHBOARD ============================= */
+function renderTeam(){
+  const el = document.getElementById('view-team');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  const t = state.targets;
+  const rows = state.agents.map(a=>{
+    const sc = scoreAgent(a,t,state.weights);
+    return `<tr class="row-link" onclick="openAgent('${esc(a.name)}')">
+      <td><div class="name-cell"><span class="flagbar" style="background:${scoreColor(sc.overall)}"></span>${esc(a.name)}</div></td>
+      <td class="mono">${a.calls}</td>
+      <td class="mono" style="color:${a.csat==null?'var(--text-faint)': a.csat<50?'var(--coral)': a.csat<75?'var(--amber)':'var(--green)'}">${a.csat==null?'—':a.csat.toFixed(0)+'%'}</td>
+      <td class="mono" style="color:${a.aht>t.aht?'var(--coral)':'var(--green)'}">${fmtSec(a.aht)}</td>
+      <td class="mono" style="color:${a.acw>t.acw?'var(--coral)':'var(--green)'}">${Math.round(a.acw)}s</td>
+      <td class="mono">${a.holdPct.toFixed(0)}%</td>
+      <td class="mono" style="color:${a.holdAvg>t.hold?'var(--coral)':'var(--green)'}">${fmtSec(a.holdAvg)}</td>
+      <td class="mono" style="color:${a.noCase>0?'var(--coral)':'var(--text-dim)'}">${a.noCase}</td>
+      <td class="mono">${a.ghost}</td>
+      <td class="mono" style="color:${a.ghost60>20?'var(--amber)':'var(--text-dim)'}">${a.ghost60}</td>
+      <td><span class="scorebar"><div style="width:${sc.overall}%;background:${scoreColor(sc.overall)}"></div></span>${sc.overall}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="section-title"><div><h2>Team dashboard</h2><p>Click any row to open the agent profile</p></div></div>
+    <div class="card" style="overflow-x:auto">
+    <table><thead><tr>
+      <th>Associate</th><th>Calls</th><th>CSAT</th><th>AHT</th><th>ACW</th><th>Hold %</th><th>Avg hold</th><th>No case</th><th>Ghost</th><th>Ghost&gt;60s</th><th>Score</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+/* ============================= AGENT PROFILE ============================= */
+window.openAgent = function(name){ state.currentAgent = name; showView('agent'); }
+function renderAgent(){
+  const el = document.getElementById('view-agent');
+  const a = state.agents.find(x=>x.name===state.currentAgent);
+  if(!a){ el.innerHTML = '<div class="empty">Select an agent from the Team Dashboard.</div>'; return; }
+  const t = state.targets;
+  const sc = scoreAgent(a,t,state.weights);
+  const coaching = coachingFor(a,t);
+  const initials = a.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  el.innerHTML = `
+    <span class="backlink" onclick="showView('team')">← Back to team dashboard</span>
+    <div class="agent-header">
+      <div class="avatar">${initials}</div>
+      <div style="flex:1"><h2>${esc(a.name)}</h2><p style="color:var(--text-faint);margin:2px 0 0 0">${a.calls} calls handled this week</p></div>
+      <div style="text-align:right"><div class="big mono" style="font-size:26px;color:${scoreColor(sc.overall)}">${sc.overall}</div><div style="color:var(--text-faint);font-size:12px">performance score</div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Metrics this week</h3>
+        ${metricLine('CSAT', a.csat==null?'No responses':a.csat.toFixed(1)+'%', a.csat==null? null : a.csat>=75)}
+        ${metricLine('AHT', fmtSec(a.aht)+' / target '+fmtSec(t.aht), a.aht<=t.aht)}
+        ${metricLine('ACW', Math.round(a.acw)+'s / target '+t.acw+'s', a.acw<=t.acw)}
+        ${metricLine('Hold %', a.holdPct.toFixed(1)+'%', null)}
+        ${metricLine('Avg hold time', fmtSec(a.holdAvg)+' / target '+fmtSec(t.hold), a.holdAvg<=t.hold)}
+        ${metricLine('No case created', String(a.noCase), a.noCase===0)}
+        ${metricLine('Short call %', a.shortCall.toFixed(1)+'%', null)}
+        ${metricLine('Agent disconnect %', a.agentDis.toFixed(1)+'%', a.agentDis<=25)}
+        ${metricLine('Ghost calls (total / >60s)', a.ghost+' / '+a.ghost60, a.ghost60<=20)}
+      </div>
+      <div class="card">
+        <h3>Score breakdown</h3>
+        ${Object.entries(sc.breakdown).map(([k,v])=>`<div class="metric-line"><span style="text-transform:capitalize">${k}</span><span class="scorebar"><div style="width:${v}%;background:${scoreColor(v)}"></div></span><span class="val">${v}</span></div>`).join('')}
+        <div class="divider"></div>
+        <h3>Trend</h3>
+        <div style="color:var(--text-faint);font-size:12.5px">Only one week of history is loaded for this agent. Import additional weeks to unlock trend lines.</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="card">
+      <h3>Coaching recommendations</h3>
+      ${coaching.map(c=>`<div class="coach-card" style="border-left-color:${PRIORITY_COLOR[c.priority]}"><span class="pill ${scoreLikePill(c.priority)}">${PRIORITY_LABEL[c.priority]}</span><div style="margin-top:8px">${c.text}</div></div>`).join('')}
+    </div>
+  `;
+}
+function metricLine(label,val,good){
+  const color = good===null||good===undefined? 'var(--text)' : (good? 'var(--green)':'var(--coral)');
+  return `<div class="metric-line"><span>${label}</span><span class="val" style="color:${color}">${val}</span></div>`;
+}
+function scoreLikePill(p){ return {critical:'coral',high:'amber',medium:'violet',data:'dim',good:'green'}[p]; }
+
+/* ============================= SCORE VIEW ============================= */
+function renderScore(){
+  const el = document.getElementById('view-score');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  const agg = computeAggregates();
+  el.innerHTML = `
+    <div class="section-title"><div><h2>Overall performance score</h2><p>Weighted composite across CSAT, AHT, hold time, ACW, case logging and ghost-call risk</p></div>
+    <span class="pill ${scorePill(agg.teamScore)}">Team average ${agg.teamScore}</span></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Leaderboard</h3>
+        ${agg.scores.map((r,i)=>`<div class="metric-line" style="cursor:pointer" onclick="openAgent('${esc(r.name)}')">
+          <span>${i+1}. ${esc(r.name)}</span>
+          <span><span class="scorebar"><div style="width:${r.overall}%;background:${scoreColor(r.overall)}"></div></span><span class="val" style="color:${scoreColor(r.overall)}">${r.overall}</span></span>
+        </div>`).join('')}
+      </div>
+      <div class="card">
+        <h3>Score distribution</h3>
+        <canvas id="scoreChart" height="220"></canvas>
+        <div class="divider"></div>
+        <h3>Scoring weights (edit in Settings)</h3>
+        ${Object.entries(state.weights).map(([k,v])=>`<div class="metric-line"><span style="text-transform:capitalize">${k}</span><span class="val">${v}%</span></div>`).join('')}
+      </div>
+    </div>`;
+  drawScoreChart(agg);
+}
+function drawScoreChart(agg){
+  const ctx = document.getElementById('scoreChart');
+  if(!ctx) return;
+  if(charts.score) charts.score.destroy();
+  const buckets = [0,0,0,0,0]; // <50,50-64,65-74,75-84,85-100
+  agg.scores.forEach(s=>{
+    const v=s.overall;
+    if(v<50) buckets[0]++; else if(v<65) buckets[1]++; else if(v<75) buckets[2]++; else if(v<85) buckets[3]++; else buckets[4]++;
+  });
+  charts.score = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:['<50','50–64','65–74','75–84','85+'], datasets:[{data:buckets, backgroundColor:['#F2545B','#F2545B','#F2A93B','#4CC9F0','#3DD68C'], borderRadius:4}]},
+    options:{ plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}, ticks:{color:'#8B93AC'}}, y:{grid:{color:'#1E263C'}, ticks:{color:'#8B93AC', stepSize:1}} } }
+  });
+}
+
+/* ============================= TEAM INSIGHTS ============================= */
+function renderInsights(){
+  const el = document.getElementById('view-insights');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  const agg = computeAggregates();
+  const t = state.targets;
+  const highHold = state.agents.filter(a=>a.holdPct>65);
+  const lowHold = state.agents.filter(a=>a.holdPct<=65);
+  const avg = arr=>arr.length? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
+  const ghostHighHold = avg(highHold.map(a=>a.ghost60));
+  const ghostLowHold = avg(lowHold.map(a=>a.ghost60));
+  const topGhost = [...state.agents].sort((a,b)=>b.ghost60-a.ghost60).slice(0,3);
+
+  const notes = [];
+  if(agg.acwMeetPct<20) notes.push({sev:'coral', text:`Only ${Math.round(agg.acwMeetPct)}% of agents meet the ${t.acw}s ACW target — this looks like a systemic wrap-up issue rather than an individual coaching gap. Consider reviewing the target or the after-call workflow/tools.`});
+  if(agg.ahtMeetPct<50) notes.push({sev:'amber', text:`${Math.round(agg.ahtMeetPct)}% of agents are within the AHT target — worth checking call complexity or staffing on the queues driving this.`});
+  if(agg.csatMissingCount>0) notes.push({sev:'dim', text:`${agg.csatMissingCount} agent(s) have no CSAT responses this week — treat their score as incomplete, not zero, until survey coverage is confirmed.`});
+  if(highHold.length>0 && lowHold.length>0) notes.push({sev:'violet', text:`Agents with hold % above 65% average ${ghostHighHold.toFixed(1)} ghost calls &gt;60s, versus ${ghostLowHold.toFixed(1)} for agents below 65% — high hold usage may be linked to ghost-call risk.`});
+  if(agg.noCaseAgents>0) notes.push({sev:'coral', text:`${agg.noCaseAgents} agent(s) logged calls with no case this week (${agg.noCaseTotal} calls total) — a compliance and reporting-accuracy risk worth flagging in team huddle.`});
+  notes.push({sev:'cyan', text:`Highest ghost-call volumes (&gt;60s): ${topGhost.map(a=>a.name+' ('+a.ghost60+')').join(', ')}.`});
+
+  el.innerHTML = `
+    <div class="section-title"><h2>Team insights</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">Automatically generated from this week's import</p></div>
+    <div class="grid g2">
+      <div class="card"><h3>Target attainment</h3><canvas id="attainChart" height="200"></canvas></div>
+      <div class="card"><h3>Patterns &amp; flags</h3>
+        ${notes.map(n=>`<div class="insight-row"><span class="badge-dot" style="background:${n.sev==='dim'?'var(--text-faint)':'var(--'+n.sev+')'}"></span><div>${n.text}</div></div>`).join('')}
+      </div>
+    </div>`;
+  drawAttainChart(agg);
+}
+function drawAttainChart(agg){
+  const ctx = document.getElementById('attainChart'); if(!ctx) return;
+  if(charts.attain) charts.attain.destroy();
+  charts.attain = new Chart(ctx,{
+    type:'bar',
+    data:{ labels:['AHT','Avg hold','ACW'], datasets:[{label:'% meeting target', data:[agg.ahtMeetPct,agg.holdMeetPct,agg.acwMeetPct], backgroundColor:['#4CC9F0','#9C7CF4','#F2A93B'], borderRadius:4}]},
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{ x:{max:100, grid:{color:'#1E263C'}, ticks:{color:'#8B93AC'}}, y:{grid:{display:false}, ticks:{color:'#8B93AC'}} } }
+  });
+}
+
+/* ============================= COACHING ENGINE ============================= */
+function renderCoaching(){
+  const el = document.getElementById('view-coaching');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  const t = state.targets;
+  const rows = state.agents.map(a=>({a, items: coachingFor(a,t)}))
+    .sort((x,y)=> Math.min(...x.items.map(i=>PRIORITY_ORDER[i.priority])) - Math.min(...y.items.map(i=>PRIORITY_ORDER[i.priority])));
+  el.innerHTML = `
+    <div class="section-title"><h2>Coaching recommendation engine</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">Rule-based, generated from this week's metrics vs. targets — always pair with a listen-in before the conversation</p></div>
+    ${rows.map(r=>`
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <b style="cursor:pointer" onclick="openAgent('${esc(r.a.name)}')">${esc(r.a.name)}</b>
+          <span class="pill ${scoreLikePill(r.items[0].priority)}">${PRIORITY_LABEL[r.items[0].priority]}</span>
+        </div>
+        ${r.items.map(i=>`<div class="coach-card" style="border-left-color:${PRIORITY_COLOR[i.priority]}">${i.text}</div>`).join('')}
+      </div>`).join('')}
+  `;
+}
+
+/* ============================= 1:1 COACHING WORKSPACE ============================= */
+/* Additive module — reuses scoreAgent(), coachingFor(), fmtSec(), esc(), the
+   existing storage helpers (sget/sset), and existing card/field/pill CSS
+   classes. Does not modify any other view or function. */
+function deriveStrengths(a, t){
+  const s = [];
+  if(a.csat!=null && a.csat>=85) s.push(`Strong CSAT at ${a.csat.toFixed(0)}% — well above team norm.`);
+  if(a.aht<=t.aht) s.push(`AHT of ${fmtSec(a.aht)} is within the ${fmtSec(t.aht)} target — efficient call handling.`);
+  if(a.holdAvg<=t.hold) s.push(`Average hold of ${fmtSec(a.holdAvg)} is within target.`);
+  if(a.acw<=t.acw) s.push(`ACW of ${Math.round(a.acw)}s meets target — rare across the team this week.`);
+  if(a.noCase===0) s.push(`No compliance gaps — every call this week was logged with a case.`);
+  if(a.agentDis<=10) s.push(`Low agent-initiated disconnect rate (${a.agentDis.toFixed(1)}%) — good call ownership.`);
+  if(s.length===0) s.push(`No standout strengths against target this week — focus the session on the improvement areas below.`);
+  return s;
+}
+function coachNotesKey(agentName){ return 'coachnotes:'+state.team+':'+state.weekId+':'+agentName; }
+async function loadCoachNotes(agentName){
+  const n = await sget(coachNotesKey(agentName));
+  return n || { date: new Date().toISOString().slice(0,10), sessionType:'Weekly 1:1', discussion:'', actionPlan:'', teamLeader:'', followUpDate:'', followUpObjectives:'' };
+}
+window.selectCoachAgent = async function(name){
+  state.coach1on1Agent = name;
+  await renderCoach1on1();
+}
+window.saveCoachNotes = async function(){
+  const name = state.coach1on1Agent;
+  if(!name) return;
+  const notes = {
+    date: document.getElementById('c11_date').value,
+    sessionType: document.getElementById('c11_type').value,
+    discussion: document.getElementById('c11_discussion').value,
+    actionPlan: document.getElementById('c11_action').value,
+    teamLeader: document.getElementById('c11_tl').value,
+    followUpDate: document.getElementById('c11_followupDate').value,
+    followUpObjectives: document.getElementById('c11_followupObj').value,
+  };
+  await sset(coachNotesKey(name), notes);
+  const msg = document.getElementById('c11_saveMsg');
+  if(msg){ msg.textContent = 'Notes saved.'; msg.style.color='var(--green)'; setTimeout(()=>{ if(msg) msg.textContent=''; },1500); }
+}
+async function renderCoach1on1(){
+  const el = document.getElementById('view-coach1on1');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  if(!state.coach1on1Agent) state.coach1on1Agent = state.agents[0].name;
+  const a = state.agents.find(x=>x.name===state.coach1on1Agent) || state.agents[0];
+  const t = state.targets;
+  const sc = scoreAgent(a,t,state.weights);
+  const strengths = deriveStrengths(a,t);
+  const improvements = coachingFor(a,t);
+  const notes = await loadCoachNotes(a.name);
+  const weekLabel = (state.weeks.find(w=>w.id===state.weekId)||{}).label || '';
+
+  el.innerHTML = `
+    <div class="section-title"><div><h2>1:1 coaching workspace</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">Prep and document one-to-one sessions using this week's live KPIs and targets</p></div>
+      <select id="c11_agentSelect" onchange="selectCoachAgent(this.value)">
+        ${state.agents.map(x=>`<option value="${esc(x.name)}" ${x.name===a.name?'selected':''}>${esc(x.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>${esc(a.name)} — this week's KPIs vs. target</h3>
+        <div class="metric-line"><span>Score</span><span class="val" style="color:${scoreColor(sc.overall)}">${sc.overall}</span></div>
+        ${metricLine('CSAT', a.csat==null?'No responses':a.csat.toFixed(1)+'%', a.csat==null? null : a.csat>=75)}
+        ${metricLine('AHT', fmtSec(a.aht)+' / target '+fmtSec(t.aht), a.aht<=t.aht)}
+        ${metricLine('ACW', Math.round(a.acw)+'s / target '+t.acw+'s', a.acw<=t.acw)}
+        ${metricLine('Avg hold time', fmtSec(a.holdAvg)+' / target '+fmtSec(t.hold), a.holdAvg<=t.hold)}
+        ${metricLine('No case created', String(a.noCase)+' / target '+t.noCase, a.noCase<=t.noCase)}
+        ${metricLine('Agent disconnect %', a.agentDis.toFixed(1)+'%', a.agentDis<=25)}
+        ${metricLine('Ghost calls >60s', String(a.ghost60), a.ghost60<=20)}
+      </div>
+      <div class="card">
+        <h3>AI-generated coaching brief</h3>
+        <div style="color:var(--text-dim);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Strengths</div>
+        ${strengths.map(s=>`<div class="coach-card" style="border-left-color:var(--green)">${s}</div>`).join('')}
+        <div style="color:var(--text-dim);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;margin:14px 0 6px 0">Priority improvement areas &amp; recommended actions</div>
+        ${improvements.map(i=>`<div class="coach-card" style="border-left-color:${PRIORITY_COLOR[i.priority]}"><span class="pill ${scoreLikePill(i.priority)}" style="margin-bottom:6px;display:inline-block">${PRIORITY_LABEL[i.priority]}</span><div>${i.text}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>TL session notes</h3>
+        <div class="field-row"><label class="field">Team leader</label><input type="text" id="c11_tl" placeholder="Your name" value="${esc(notes.teamLeader||'')}"></div>
+        <div class="field-row"><label class="field">Date</label><input type="date" id="c11_date" value="${esc(notes.date)}"></div>
+        <div class="field-row"><label class="field">Session type</label>
+          <select id="c11_type">
+            ${['Weekly 1:1','Performance improvement','Coaching follow-up','Recognition','Ad-hoc'].map(o=>`<option ${notes.sessionType===o?'selected':''}>${o}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field-row"><label class="field">Discussion points</label><textarea id="c11_discussion" rows="5">${esc(notes.discussion)}</textarea></div>
+        <div class="field-row"><label class="field">Action plan</label><textarea id="c11_action" rows="5" placeholder="One action per line. For a structured table in the PDF, use: Action — Owner — Due date — Status">${esc(notes.actionPlan)}</textarea></div>
+        <div class="field-row"><label class="field">Follow-up date</label><input type="date" id="c11_followupDate" value="${esc(notes.followUpDate||'')}"></div>
+        <div class="field-row"><label class="field">Follow-up objectives</label><textarea id="c11_followupObj" rows="3">${esc(notes.followUpObjectives||'')}</textarea></div>
+        <button class="btn secondary" onclick="saveCoachNotes()">Save notes</button>
+        <span id="c11_saveMsg" style="margin-left:10px;font-size:12.5px"></span>
+      </div>
+      <div class="card">
+        <h3>Export</h3>
+        <p style="color:var(--text-faint);font-size:12.5px">Generates a shareable PDF combining this agent's KPIs, targets, coaching brief and your session notes — save your notes first so the export includes the latest version.</p>
+        <button class="btn" onclick="generateCoachingSummary()">Generate coaching summary (PDF)</button>
+      </div>
+    </div>
+  `;
+}
+/* Colors reused from the app's own CSS custom properties, so the PDF stays
+   visually consistent with the on-screen design system. */
+const PDF_COLORS = {
+  navy: [15, 20, 32], panel: [27, 35, 56], border: [200, 205, 218],
+  textDark: [30, 34, 46], textDim: [110, 118, 140],
+  cyan: [30, 140, 180], green: [20, 140, 95], coral: [200, 55, 65],
+  amber: [190, 120, 20], violet: [110, 80, 190],
+};
+function pdfPriorityColor(p){ return {critical:PDF_COLORS.coral, high:PDF_COLORS.amber, medium:PDF_COLORS.violet, low:PDF_COLORS.green}[p] || PDF_COLORS.textDim; }
+function splitIssueAction(text){
+  const idx = text.indexOf(' — ');
+  if(idx===-1) return [text, ''];
+  return [text.slice(0,idx), text.slice(idx+3)];
+}
+function metricRow(label, current, status, priority){ return [label, current, status, priority]; }
+function evaluateMetric(current, isMet, severity){
+  return { status: isMet ? 'Met' : 'Needs improvement', priority: isMet ? 'Low' : severity };
+}
+function buildPerformanceRows(a,t){
+  const rows = [];
+  if(a.csat==null){ rows.push(['CSAT', 'No responses', String(a.csat!=null? a.csat.toFixed(1)+'%':'—')==='—'?'No data':'No data', 'Medium']); }
+  else { const ev = evaluateMetric(a.csat, a.csat>=75, a.csat<50?'Critical':'High'); rows.push(['CSAT', a.csat.toFixed(1)+'%', ev.status, ev.priority]); }
+  { const ev = evaluateMetric(a.aht, a.aht<=t.aht, a.aht>t.aht*1.3?'Critical':'High'); rows.push(['AHT', fmtSec(a.aht)+` (target ${fmtSec(t.aht)})`, ev.status, ev.priority]); }
+  { const ev = evaluateMetric(a.holdAvg, a.holdAvg<=t.hold, a.holdAvg>t.hold*1.5?'High':'Medium'); rows.push(['Avg hold time', fmtSec(a.holdAvg)+` (target ${fmtSec(t.hold)})`, ev.status, ev.priority]); }
+  { const ev = evaluateMetric(a.acw, a.acw<=t.acw, a.acw>t.acw*2.5?'Medium':'Low'); rows.push(['ACW', Math.round(a.acw)+`s (target ${t.acw}s)`, ev.status, ev.priority]); }
+  { const ev = evaluateMetric(a.noCase, a.noCase<=t.noCase, a.noCase>=3?'Critical':'High'); rows.push(['No case created', String(a.noCase)+` (target ${t.noCase})`, ev.status, ev.priority]); }
+  { const ev = evaluateMetric(a.agentDis, a.agentDis<=25, 'Critical'); rows.push(['Agent disconnect %', a.agentDis.toFixed(1)+'%', ev.status, ev.priority]); }
+  { const ev = evaluateMetric(a.ghost60, a.ghost60<=20, 'High'); rows.push(['Ghost calls >60s', String(a.ghost60), ev.status, ev.priority]); }
+  return rows;
+}
+function parseActionPlanRows(text){
+  const lines = (text||'').split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length===0) return [['No action items recorded.', '—', '—', '—']];
+  return lines.map(line=>{
+    const parts = line.split(' — ').map(s=>s.trim());
+    return [parts[0]||line, parts[1]||'Agent', parts[2]||'TBD', parts[3]||'Pending'];
+  });
+}
+window.generateCoachingSummary = async function(){
+  await saveCoachNotes();
+  const a = state.agents.find(x=>x.name===state.coach1on1Agent);
+  if(!a) return;
+  const t = state.targets;
+  const sc = scoreAgent(a,t,state.weights);
+  const strengths = deriveStrengths(a,t).slice(0,3);
+  const improvements = coachingFor(a,t).filter(i=>i.priority!=='good');
+  const notes = await loadCoachNotes(a.name);
+  const weekLabel = (state.weeks.find(w=>w.id===state.weekId)||{}).label || '';
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const marginX = 48;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const maxW = pageW - marginX*2;
+  let y = 0;
+
+  // --- Header banner ---
+  doc.setFillColor(...PDF_COLORS.navy);
+  doc.rect(0, 0, pageW, 92, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold'); doc.setFontSize(18);
+  doc.text('Coaching Session Summary', marginX, 40);
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(`${a.name}  ·  ${state.team}  ·  ${weekLabel}`, marginX, 62);
+  doc.setFontSize(9); doc.setTextColor(190,200,220);
+  doc.text('Confidential — for internal coaching use', marginX, 78);
+  y = 118;
+
+  function checkPage(needed){ if(y + needed > pageH - 48){ doc.addPage(); y = 48; } }
+  function sectionHeader(title){
+    checkPage(30);
+    doc.setFillColor(...PDF_COLORS.cyan);
+    doc.rect(marginX, y-11, 4, 14, 'F');
+    doc.setTextColor(...PDF_COLORS.textDark);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12.5);
+    doc.text(title, marginX+10, y);
+    y += 16;
+  }
+  function bodyText(text, opts={}){
+    doc.setFont('helvetica', opts.bold? 'bold':'normal');
+    doc.setFontSize(opts.size||10);
+    doc.setTextColor(...(opts.color||PDF_COLORS.textDark));
+    const lines = doc.splitTextToSize(text, maxW - (opts.indent||0));
+    lines.forEach(line=>{
+      checkPage(16);
+      doc.text(line, marginX+(opts.indent||0), y);
+      y += (opts.size||10) + 4;
+    });
+  }
+  function bullet(text, dotColor){
+    checkPage(16);
+    doc.setFillColor(...(dotColor||PDF_COLORS.cyan));
+    doc.circle(marginX+4, y-3.5, 2.2, 'F');
+    bodyText(text, {indent:14});
+  }
+  function spacer(n=10){ y += n; }
+
+  // --- 1. Session information ---
+  sectionHeader('1. Session Information');
+  const infoPairs = [
+    ['Agent', a.name], ['Team', state.team],
+    ['Team leader', notes.teamLeader || '—'], ['Coaching date', notes.date || '—'],
+    ['Coaching type', notes.sessionType || '—'], ['Week', weekLabel],
+  ];
+  const colW = maxW/2;
+  const infoRowH = 30;
+  infoPairs.forEach((pair,i)=>{
+    const col = i%2, row = Math.floor(i/2);
+    const x = marginX + col*colW;
+    const rowY = y + row*infoRowH;
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...PDF_COLORS.textDim);
+    doc.text(pair[0].toUpperCase(), x, rowY);
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(...PDF_COLORS.textDark);
+    doc.text(String(pair[1]), x, rowY+14);
+  });
+  y += Math.ceil(infoPairs.length/2)*infoRowH + 16;
+
+  // --- 2. Performance overview ---
+  sectionHeader('2. Performance Overview');
+  y += 4;
+  doc.autoTable({
+    startY: y, margin:{left:marginX, right:marginX},
+    head: [['KPI','Current value / target','Status','Priority']],
+    body: buildPerformanceRows(a,t),
+    theme:'grid',
+    headStyles:{ fillColor:PDF_COLORS.navy, textColor:255, fontStyle:'bold', fontSize:9.5 },
+    styles:{ fontSize:9.5, cellPadding:5, textColor:PDF_COLORS.textDark, lineColor:PDF_COLORS.border },
+    columnStyles:{ 0:{cellWidth:120}, 2:{cellWidth:100}, 3:{cellWidth:80} },
+    didParseCell: (data)=>{
+      if(data.section==='body'){
+        if(data.column.index===2){ data.cell.styles.textColor = data.cell.raw==='Met'? PDF_COLORS.green : data.cell.raw==='No data'? PDF_COLORS.textDim : PDF_COLORS.coral; data.cell.styles.fontStyle='bold'; }
+        if(data.column.index===3){ data.cell.styles.textColor = pdfPriorityColor(String(data.cell.raw).toLowerCase()); data.cell.styles.fontStyle='bold'; }
+      }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 22;
+
+  // --- 3. Overall performance summary ---
+  sectionHeader('3. Overall Performance Summary');
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...(sc.overall>=85?PDF_COLORS.green:sc.overall>=65?PDF_COLORS.amber:PDF_COLORS.coral));
+  doc.text(String(sc.overall)+'/100', marginX, y+4);
+  y += 22;
+  const mainRisk = improvements[0]? splitIssueAction(improvements[0].text)[0] : null;
+  const mainStrength = strengths[0] || '';
+  const summaryText = `${a.name} closed ${weekLabel} with an overall performance score of ${sc.overall}/100, handling ${a.calls} calls. `
+    + (mainStrength ? mainStrength.replace(/\.$/,'') + '. ' : '')
+    + (mainRisk ? `The main area to focus the session on is: ${mainRisk.toLowerCase()}.` : 'No metric currently falls outside target — this is a good week to reinforce consistency and discuss growth opportunities.');
+  bodyText(summaryText);
+  spacer(14);
+
+  // --- 4. Strengths ---
+  sectionHeader('4. Strengths');
+  if(strengths.length===0) bodyText('No standout strengths against target this week.');
+  strengths.forEach(s=>bullet(s, PDF_COLORS.green));
+  spacer(14);
+
+  // --- 5. Development areas ---
+  sectionHeader('5. Development Areas');
+  if(improvements.length===0) bodyText('No development areas flagged this week — every monitored metric is within target.');
+  improvements.forEach(i=>{
+    const [issue] = splitIssueAction(i.text);
+    bullet(`${issue}. (Priority: ${PRIORITY_LABEL[i.priority]}, flagged as it falls outside this week's target threshold.)`, pdfPriorityColor(i.priority));
+  });
+  spacer(14);
+
+  // --- 6. Recommended coaching actions ---
+  sectionHeader('6. Recommended Coaching Actions');
+  if(improvements.length===0) bodyText('Continue current approach and consider this agent for peer mentoring or QA calibration.');
+  improvements.forEach(i=>{
+    const [, action] = splitIssueAction(i.text);
+    bullet(action || i.text, PDF_COLORS.cyan);
+  });
+  spacer(14);
+
+  // --- 7. Discussion summary ---
+  sectionHeader('7. Discussion Summary');
+  bodyText(notes.discussion || 'No discussion notes recorded for this session.');
+  spacer(14);
+
+  // --- 8. Agreed action plan ---
+  sectionHeader('8. Agreed Action Plan');
+  y += 4;
+  doc.autoTable({
+    startY: y, margin:{left:marginX, right:marginX},
+    head: [['Action item','Owner','Target completion','Status']],
+    body: parseActionPlanRows(notes.actionPlan),
+    theme:'grid',
+    headStyles:{ fillColor:PDF_COLORS.navy, textColor:255, fontStyle:'bold', fontSize:9.5 },
+    styles:{ fontSize:9.5, cellPadding:5, textColor:PDF_COLORS.textDark, lineColor:PDF_COLORS.border },
+  });
+  y = doc.lastAutoTable.finalY + 22;
+
+  // --- 9. Follow-up session ---
+  sectionHeader('9. Follow-up Session');
+  bodyText(`Planned follow-up date: ${notes.followUpDate || 'Not yet scheduled'}`, {bold:true});
+  bodyText(notes.followUpObjectives || 'No follow-up objectives recorded yet.');
+
+  // --- Footer on every page ---
+  const pageCount = doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setDrawColor(...PDF_COLORS.border); doc.setLineWidth(0.5);
+    doc.line(marginX, pageH-36, pageW-marginX, pageH-36);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...PDF_COLORS.textDim);
+    doc.text(`${state.team} · Ops Console coaching record`, marginX, pageH-22);
+    doc.text(`Page ${i} of ${pageCount}`, pageW-marginX, pageH-22, {align:'right'});
+  }
+
+  doc.save(`1-1-coaching-${a.name.replace(/\s+/g,'-')}-${weekLabel.replace(/\s+/g,'-')}.pdf`);
+}
+
+/* ============================= ACTION CENTER ============================= */
+function renderActions(){
+  const el = document.getElementById('view-actions');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  const t = state.targets;
+  let all = [];
+  state.agents.forEach(a=>{
+    coachingFor(a,t).forEach((it,idx)=>{
+      if(it.priority==='good') return;
+      all.push({agent:a.name, ...it, id: a.name+'::'+idx});
+    });
+  });
+  all.sort((x,y)=>PRIORITY_ORDER[x.priority]-PRIORITY_ORDER[y.priority]);
+  window._actionFilter = window._actionFilter || 'all';
+  const filtered = window._actionFilter==='all'? all : all.filter(x=>x.priority===window._actionFilter);
+  el.innerHTML = `
+    <div class="section-title"><div><h2>Action center</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">${all.length} open items this week</p></div></div>
+    <div class="filter-bar">
+      ${['all','critical','high','medium','data'].map(p=>`<button class="${window._actionFilter===p?'on':''}" onclick="setActionFilter('${p}')">${p==='all'?'All':PRIORITY_LABEL[p]}</button>`).join('')}
+    </div>
+    <div class="card">
+      ${filtered.length? filtered.map(it=>`
+        <div class="insight-row">
+          <span class="badge-dot" style="background:${PRIORITY_COLOR[it.priority]}"></span>
+          <div style="flex:1">
+            <div class="checkbox-row"><input type="checkbox" ${state.actioned[it.id]?'checked':''} onchange="toggleActioned('${esc(it.id)}',this.checked)">
+            <b style="cursor:pointer" onclick="openAgent('${esc(it.agent)}')">${esc(it.agent)}</b> <span class="pill ${scoreLikePill(it.priority)}">${PRIORITY_LABEL[it.priority]}</span></div>
+            <div style="margin-top:4px;${state.actioned[it.id]?'opacity:.5;text-decoration:line-through':''}">${it.text}</div>
+          </div>
+        </div>`).join('') : '<div class="empty">No items match this filter.</div>'}
+    </div>`;
+}
+window.setActionFilter = function(p){ window._actionFilter = p; renderActions(); }
+window.toggleActioned = async function(id, val){
+  state.actioned[id] = val;
+  await sset('actioned:'+state.team+':'+state.weekId, state.actioned);
+}
+
+/* ============================= EXEC SUMMARY ============================= */
+function renderExec(){
+  const el = document.getElementById('view-exec');
+  if(state.agents.length===0){ el.innerHTML = emptyState(); return; }
+  const agg = computeAggregates();
+  const t = state.targets;
+  const week = (state.weeks.find(w=>w.id===state.weekId)||{}).label || '';
+  const risk = agg.scores.filter(s=>s.overall<65);
+  const top = agg.scores.slice(0,3);
+  const criticalItems = [];
+  state.agents.forEach(a=>coachingFor(a,t).forEach(it=>{ if(it.priority==='critical') criticalItems.push(a.name+': '+it.text); }));
+
+  el.innerHTML = `
+    <div class="section-title"><div><h2>Weekly executive summary</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">${esc(state.team)} · ${esc(week)}</p></div>
+    <button class="btn secondary" onclick="copyExec()">Copy text</button></div>
+    <div class="exec-block" id="execText">
+      <h4>Volume &amp; quality</h4>
+      <p>The team handled <b>${agg.totalCalls.toLocaleString()}</b> calls this week across <b>${state.agents.length}</b> agents, with a team performance score of <b>${agg.teamScore}/100</b>. ${agg.avgCsat!=null? `Average CSAT stood at <b>${agg.avgCsat.toFixed(1)}%</b>` : 'CSAT could not be averaged'}${agg.csatMissingCount? `, though ${agg.csatMissingCount} agent(s) returned no survey responses and should be treated as data gaps rather than failures.` : '.'}</p>
+      <h4>Efficiency vs. targets</h4>
+      <p>Average handle time was <b>${fmtSec(agg.avgAht)}</b> against a target of ${fmtSec(t.aht)}, with <b>${Math.round(agg.ahtMeetPct)}%</b> of agents at or under target. Average hold time was <b>${fmtSec(agg.avgHold)}</b> (target ${fmtSec(t.hold)}, ${Math.round(agg.holdMeetPct)}% meeting it), and average after-call work was <b>${Math.round(agg.avgAcw)}s</b> against a ${t.acw}s target — only <b>${Math.round(agg.acwMeetPct)}%</b> of agents met it, which likely points to a process or target-calibration question rather than individual performance.</p>
+      <h4>Risk &amp; compliance</h4>
+      <p><b>${agg.noCaseAgents}</b> agent(s) closed a total of <b>${agg.noCaseTotal}</b> calls with no case logged, and <b>${agg.ghost60Total}</b> ghost calls lasted over 60 seconds across the team. ${agg.highDisAgents? `<b>${agg.highDisAgents}</b> agent(s) show an elevated agent-initiated disconnect rate and warrant urgent review.` : 'No agents show an elevated agent-initiated disconnect rate this week.'}</p>
+      <h4>Highlights</h4>
+      <p>Top scoring this week: ${top.map(s=>s.name+' ('+s.overall+')').join(', ')}. ${risk.length? `Agents below the 65 risk threshold: ${risk.map(s=>s.name+' ('+s.overall+')').join(', ')}.` : 'No agents currently fall below the 65 risk threshold.'}</p>
+      ${criticalItems.length? `<h4>Needs TL attention this week</h4><p>${criticalItems.slice(0,5).join('<br>')}</p>` : ''}
+    </div>`;
+}
+window.copyExec = function(){
+  const text = document.getElementById('execText').innerText;
+  navigator.clipboard?.writeText(text);
+}
+
+/* ============================= IMPORT ============================= */
+function renderImport(){
+  const el = document.getElementById('view-import');
+  el.innerHTML = `
+    <div class="section-title"><h2>Weekly data import</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">Paste rows copied from your Google Sheet (tab-separated). Column order: Associate, Calls Handled, CSAT %, AHT, ACW, Hold %, Hold (avg time), No Case Created, Short Call %, Agent Dis %, Ghost Calls, Ghost Calls &gt;60Sec</p></div>
+    <div class="grid g2">
+      <div class="card">
+        <div class="field-row"><label class="field">Week label</label><input type="text" id="impLabel" placeholder="e.g. Week 37"></div>
+        <div class="field-row"><label class="field">Upload date</label><input type="date" id="impDate"></div>
+        <div class="field-row"><label class="field">Paste data (one row per agent)</label><textarea id="impData" rows="12" placeholder="Saja Nour&#9;158&#9;0.00%&#9;0:09:02&#9;0:01:01&#9;41.77%&#9;0:03:24&#9;2&#9;64.29%&#9;8.81%&#9;37&#9;18"></textarea></div>
+        <button class="btn" onclick="previewImport()">Preview import</button>
+        <button class="btn ghost" onclick="loadSample()">Load sample dataset</button>
+        <div id="impMsg" style="margin-top:10px;font-size:12.5px;color:var(--text-faint)"></div>
+        <div id="impPreview" style="margin-top:14px"></div>
+      </div>
+      <div class="card">
+        <h3>Import history</h3>
+        ${state.weeks.map(w=>`<div class="metric-line"><span>${esc(w.label)}</span><span class="val" style="color:var(--text-faint)">${esc(w.uploadedAt)}</span></div>`).join('')}
+        <div class="divider"></div>
+        <h3>Notes</h3>
+        <p style="color:var(--text-faint);font-size:12.5px">FCR (7 day) is a target in Settings but is not part of this weekly export. Add an "FCR %" column to future exports to include it in scoring automatically — the platform will pick it up without further changes.</p>
+      </div>
+    </div>`;
+  document.getElementById('impDate').value = new Date().toISOString().slice(0,10);
+}
+function parseTimeToSec(s){
+  s = s.trim(); if(s==='') return null;
+  const parts = s.split(':').map(Number);
+  if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+  if(parts.length===2) return parts[0]*60+parts[1];
+  return Number(s)||0;
+}
+function parsePct(s){ s=(s||'').replace('%','').trim(); return s===''? null : Number(s); }
+
+function parseImportRows(raw){
+  const lines = raw.split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const agents = [];
+  for(const line of lines){
+    const c = line.split('\t').length>1? line.split('\t') : line.split(/\s{2,}|,/);
+    if(c.length<11){ continue; }
+    agents.push({
+      name: c[0].trim(),
+      calls: Number(c[1])||0,
+      csat: parsePct(c[2]),
+      aht: parseTimeToSec(c[3]),
+      acw: parseTimeToSec(c[4]),
+      holdPct: parsePct(c[5])||0,
+      holdAvg: parseTimeToSec(c[6]),
+      noCase: Number(c[7])||0,
+      shortCall: parsePct(c[8])||0,
+      agentDis: parsePct(c[9])||0,
+      ghost: Number(c[10])||0,
+      ghost60: Number(c[11])||0
+    });
+  }
+  return agents;
+}
+
+window.previewImport = function(){
+  const raw = document.getElementById('impData').value.trim();
+  const msg = document.getElementById('impMsg');
+  const preview = document.getElementById('impPreview');
+  msg.textContent = ''; preview.innerHTML = '';
+  if(!raw){ msg.textContent = 'Paste at least one row of data first.'; msg.style.color='var(--coral)'; return; }
+  const agents = parseImportRows(raw);
+  if(agents.length===0){ msg.textContent = 'Could not parse any rows — check the column order and that fields are tab-separated.'; msg.style.color='var(--coral)'; return; }
+  window._pendingImport = agents;
+  const rows = agents.slice(0,6).map(a=>`<tr>
+    <td>${esc(a.name)}</td><td class="mono">${a.calls}</td><td class="mono">${a.csat==null?'—':a.csat+'%'}</td>
+    <td class="mono">${fmtSec(a.aht)}</td><td class="mono">${a.acw}s</td><td class="mono">${a.holdPct}%</td>
+    <td class="mono">${fmtSec(a.holdAvg)}</td><td class="mono">${a.noCase}</td><td class="mono">${a.ghost}</td><td class="mono">${a.ghost60}</td>
+  </tr>`).join('');
+  preview.innerHTML = `
+    <div style="color:var(--text-dim);font-size:12.5px;margin-bottom:8px">Parsed ${agents.length} row(s). Check the columns line up before confirming — this is exactly how the data will be saved.</div>
+    <div class="card" style="overflow-x:auto;padding:0">
+      <table><thead><tr><th>Associate</th><th>Calls</th><th>CSAT</th><th>AHT</th><th>ACW</th><th>Hold %</th><th>Avg hold</th><th>No case</th><th>Ghost</th><th>Ghost&gt;60s</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>
+    ${agents.length>6? `<div style="color:var(--text-faint);font-size:12px;margin-top:6px">…and ${agents.length-6} more row(s), not shown here.</div>` : ''}
+    <button class="btn" style="margin-top:12px" onclick="confirmImport()">Looks correct — add as new week</button>
+    <button class="btn ghost" style="margin-top:12px" onclick="document.getElementById('impPreview').innerHTML=''">Cancel</button>
+  `;
+};
+
+window.confirmImport = async function(){
+  const agents = window._pendingImport;
+  const msg = document.getElementById('impMsg');
+  if(!agents || agents.length===0){ msg.textContent = 'Nothing to import — preview the data again first.'; msg.style.color='var(--coral)'; return; }
+  const label = document.getElementById('impLabel').value.trim() || ('Week import '+new Date().toISOString().slice(0,10));
+  const date = document.getElementById('impDate').value;
+  const weekId = 'wk_'+Date.now();
+  state.weeks.push({id:weekId, label, uploadedAt:date});
+  await sset('weeks:'+state.team, state.weeks);
+  await sset('weekdata:'+state.team+':'+weekId, agents);
+  state.weekId = weekId;
+  await loadWeekData();
+  state.actioned = {};
+  window._pendingImport = null;
+  document.getElementById('impPreview').innerHTML = '';
+  renderTopbar();
+  msg.style.color='var(--green)'; msg.textContent = `Imported ${agents.length} agents as "${label}".`;
+  setTimeout(()=>showView('team'), 400);
+};
+
+window.loadSample = function(){
+  document.getElementById('impLabel').value = 'Week 36 (sample import)';
+  document.getElementById('impData').value = SAMPLE_AGENTS.map(a=>[a.name,a.calls,(a.csat==null?'':a.csat+'%'),fmtSec(a.aht),a.acw,a.holdPct+'%',fmtSec(a.holdAvg),a.noCase,a.shortCall+'%',a.agentDis+'%',a.ghost,a.ghost60].join('\t')).join('\n');
+};
+
+/* ============================= SETTINGS ============================= */
+function renderSettings(){
+  const el = document.getElementById('view-settings');
+  const t = state.targets, w = state.weights;
+  el.innerHTML = `
+    <div class="section-title"><h2>Settings</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">Targets and score weights apply to ${esc(state.team)} only — each team is configured independently</p></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Targets</h3>
+        <div class="field-row"><label class="field">AHT target (seconds)</label><input type="number" id="t_aht" value="${t.aht}"></div>
+        <div class="field-row"><label class="field">Avg hold target (seconds)</label><input type="number" id="t_hold" value="${t.hold}"></div>
+        <div class="field-row"><label class="field">ACW target (seconds)</label><input type="number" id="t_acw" value="${t.acw}"></div>
+        <div class="field-row"><label class="field">Calls with no case (target)</label><input type="number" id="t_noCase" value="${t.noCase}"></div>
+        <div class="field-row"><label class="field">FCR 7-day target (%)</label><input type="number" id="t_fcr" value="${t.fcr}"></div>
+        <div class="field-row"><label class="field">Ghost calls &gt;60s — flag threshold</label><input type="number" id="t_ghost" value="${t.ghostWarn}"></div>
+        <button class="btn" onclick="saveTargets()">Save targets</button>
+      </div>
+      <div class="card">
+        <h3>Score weights (%)</h3>
+        <div class="field-row"><label class="field">CSAT</label><input type="number" id="w_csat" value="${w.csat}"></div>
+        <div class="field-row"><label class="field">AHT</label><input type="number" id="w_aht" value="${w.aht}"></div>
+        <div class="field-row"><label class="field">Avg hold</label><input type="number" id="w_hold" value="${w.hold}"></div>
+        <div class="field-row"><label class="field">ACW</label><input type="number" id="w_acw" value="${w.acw}"></div>
+        <div class="field-row"><label class="field">No case</label><input type="number" id="w_noCase" value="${w.noCase}"></div>
+        <div class="field-row"><label class="field">Ghost calls</label><input type="number" id="w_ghost" value="${w.ghost}"></div>
+        <div class="weight-total" id="weightTotal" style="color:var(--text-faint)"></div>
+        <button class="btn" onclick="saveWeights()">Save weights</button>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="card">
+      <h3>Danger zone</h3>
+      <p style="color:var(--text-faint);font-size:12.5px">Removes every imported week and setting for ${esc(state.team)} only.</p>
+      <button class="btn danger" onclick="resetTeam()">Reset ${esc(state.team)} data</button>
+    </div>
+  `;
+  updateWeightTotal();
+  ['w_csat','w_aht','w_hold','w_acw','w_noCase','w_ghost'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', updateWeightTotal);
+  });
+}
+function updateWeightTotal(){
+  const ids = ['w_csat','w_aht','w_hold','w_acw','w_noCase','w_ghost'];
+  const sum = ids.reduce((s,id)=>s+(Number(document.getElementById(id).value)||0),0);
+  const box = document.getElementById('weightTotal');
+  box.textContent = 'Total: '+sum+'% '+(sum===100? '✓' : '(will be auto-normalized)');
+  box.style.color = sum===100? 'var(--green)' : 'var(--amber)';
+}
+window.saveTargets = async function(){
+  state.targets = {
+    aht: Number(document.getElementById('t_aht').value)||570,
+    hold: Number(document.getElementById('t_hold').value)||120,
+    acw: Number(document.getElementById('t_acw').value)||20,
+    noCase: Number(document.getElementById('t_noCase').value)||0,
+    fcr: Number(document.getElementById('t_fcr').value)||12,
+    ghostWarn: Number(document.getElementById('t_ghost').value)||20,
+  };
+  await sset('targets:'+state.team, state.targets);
+  flashSaved();
+}
+window.saveWeights = async function(){
+  const raw = {
+    csat: Number(document.getElementById('w_csat').value)||0,
+    aht: Number(document.getElementById('w_aht').value)||0,
+    hold: Number(document.getElementById('w_hold').value)||0,
+    acw: Number(document.getElementById('w_acw').value)||0,
+    noCase: Number(document.getElementById('w_noCase').value)||0,
+    ghost: Number(document.getElementById('w_ghost').value)||0,
+  };
+  state.weights = raw;
+  await sset('weights:'+state.team, state.weights);
+  flashSaved();
+}
+function flashSaved(){
+  const box = document.getElementById('weightTotal') || document.createElement('div');
+  const old = box.textContent;
+  box.textContent = 'Saved.'; box.style.color='var(--green)';
+  setTimeout(()=>{ if(box.parentNode) { box.textContent = old; } }, 1200);
+}
+window.resetTeam = async function(){
+  if(!confirm('This will permanently remove all imported weeks and settings for '+state.team+'. Continue?')) return;
+  for(const w of state.weeks){
+    await sset('weekdata:'+state.team+':'+w.id, null);
+    await sset('actioned:'+state.team+':'+w.id, null);
+  }
+  await sset('weeks:'+state.team, []);
+  await sset('targets:'+state.team, DEFAULT_TARGETS);
+  await sset('weights:'+state.team, DEFAULT_WEIGHTS);
+  state.weeks = []; state.agents = []; state.weekId = null;
+  state.targets = {...DEFAULT_TARGETS}; state.weights = {...DEFAULT_WEIGHTS};
+  renderTopbar();
+  showView('home');
+}
+
+/* ============================= USER MANAGEMENT (Admin only) ============================= */
+/* Additive module. Reuses existing card/field-row/table/pill CSS classes and
+   the same sget/sset storage helpers as everything else. Does not touch
+   Settings, Team Dashboard, or any other existing view or function. */
+async function renderUserManagement(){
+  const el = document.getElementById('view-users');
+  if(!authSession || authSession.role!=='Admin'){
+    el.innerHTML = `<div class="empty">User management is available to Admin accounts only.</div>`;
+    return;
+  }
+  const users = await getUsers();
+  const log = (await getAuditLog()).slice().reverse().slice(0,50);
+  el.innerHTML = `
+    <div class="section-title"><h2>User management</h2><p style="color:var(--text-faint);font-size:12.5px;margin-top:2px">Add teammates, assign roles and teams, reset passwords, and review the audit trail</p></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Users</h3>
+        ${users.map(u=>`
+          <div class="metric-line" style="align-items:center">
+            <span>
+              <b>${esc(u.username)}</b> <span class="pill ${u.active?'green':'dim'}">${u.active?'Active':'Deactivated'}</span><br>
+              <span style="color:var(--text-faint);font-size:11.5px">${esc(u.role)} · ${esc(u.team||'All teams')}${u.lastLogin? ' · last login '+esc(u.lastLogin.slice(0,16).replace('T',' ')) : ''}</span>
+            </span>
+            <span style="white-space:nowrap">
+              <button class="btn ghost" style="padding:5px 8px;font-size:11px" onclick="umEditUser('${esc(u.username)}')">Edit</button>
+              <button class="btn ghost" style="padding:5px 8px;font-size:11px" onclick="umToggleActive('${esc(u.username)}')">${u.active?'Deactivate':'Activate'}</button>
+            </span>
+          </div>`).join('')}
+        <div id="umEditPanel"></div>
+        <div class="divider"></div>
+        <h3>Add user</h3>
+        <div class="field-row"><label class="field">Username</label><input type="text" id="um_newUser"></div>
+        <div class="field-row"><label class="field">Temporary password</label><input type="text" id="um_newPass" placeholder="Share with the user, ask them to note it down"></div>
+        <div class="field-row"><label class="field">Role</label>
+          <select id="um_newRole" onchange="document.getElementById('um_newTeamRow').style.display=this.value==='Team Leader'?'':'none'">
+            <option>Admin</option><option>Manager</option><option selected>Team Leader</option>
+          </select>
+        </div>
+        <div class="field-row" id="um_newTeamRow"><label class="field">Assigned team</label>
+          <select id="um_newTeam">${state.teams.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+        </div>
+        <button class="btn" onclick="umAddUser()">Add user</button>
+        <div id="umMsg" style="margin-top:8px;font-size:12.5px"></div>
+      </div>
+      <div class="card">
+        <h3>Audit log</h3>
+        <div style="max-height:520px;overflow-y:auto">
+          ${log.length? log.map(l=>`<div class="metric-line"><span style="color:var(--text-faint);font-size:11.5px">${esc(l.ts.slice(0,16).replace('T',' '))} · ${esc(l.actor)}</span><span class="val" style="font-size:11.5px">${esc(l.action)}${l.details? ' — '+esc(l.details):''}</span></div>`).join('') : '<div class="empty">No activity recorded yet.</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+}
+function umMsg(text, ok){ const el=document.getElementById('umMsg'); if(el){ el.textContent=text; el.style.color = ok?'var(--green)':'var(--coral)'; } }
+window.umAddUser = async function(){
+  const username = document.getElementById('um_newUser').value.trim();
+  const password = document.getElementById('um_newPass').value;
+  const role = document.getElementById('um_newRole').value;
+  const team = role==='Team Leader' ? document.getElementById('um_newTeam').value : null;
+  if(!username || !password){ umMsg('Username and a temporary password are required.', false); return; }
+  const users = await getUsers();
+  if(users.some(u=>u.username.toLowerCase()===username.toLowerCase())){ umMsg('That username already exists.', false); return; }
+  const salt = randomSalt();
+  const hash = await hashPassword(password, salt);
+  users.push({ username, salt, hash, role, team, active:true, createdAt:new Date().toISOString().slice(0,10), lastLogin:null });
+  await saveUsers(users);
+  await logAudit('user_created', authSession.username, `created ${username} as ${role}${team?' ('+team+')':''}`);
+  umMsg('User added.', true);
+  renderUserManagement();
+}
+window.umToggleActive = async function(username){
+  const users = await getUsers();
+  const u = users.find(x=>x.username===username); if(!u) return;
+  u.active = !u.active;
+  await saveUsers(users);
+  await logAudit(u.active?'user_activated':'user_deactivated', authSession.username, username);
+  renderUserManagement();
+}
+window.umEditUser = function(username){
+  (async ()=>{
+    const users = await getUsers();
+    const u = users.find(x=>x.username===username); if(!u) return;
+    document.getElementById('umEditPanel').innerHTML = `
+      <div class="divider"></div>
+      <h3>Edit ${esc(u.username)}</h3>
+      <div class="field-row"><label class="field">Role</label>
+        <select id="um_editRole">
+          ${['Admin','Manager','Team Leader'].map(r=>`<option ${u.role===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field-row"><label class="field">Assigned team (Team Leader only)</label>
+        <select id="um_editTeam">${state.teams.map(t=>`<option ${u.team===t?'selected':''}>${esc(t)}</option>`).join('')}</select>
+      </div>
+      <div class="field-row"><label class="field">Reset password (leave blank to keep current)</label><input type="text" id="um_editPass"></div>
+      <button class="btn secondary" onclick="umSaveEdit('${esc(username)}')">Save changes</button>
+    `;
+  })();
+}
+window.umSaveEdit = async function(username){
+  const users = await getUsers();
+  const u = users.find(x=>x.username===username); if(!u) return;
+  const newRole = document.getElementById('um_editRole').value;
+  const newTeam = newRole==='Team Leader' ? document.getElementById('um_editTeam').value : null;
+  const newPass = document.getElementById('um_editPass').value;
+  if(newRole!==u.role || newTeam!==u.team){
+    await logAudit('role_change', authSession.username, `${username}: ${u.role}(${u.team||'—'}) → ${newRole}(${newTeam||'—'})`);
+  }
+  u.role = newRole; u.team = newTeam;
+  if(newPass){
+    const salt = randomSalt();
+    u.salt = salt; u.hash = await hashPassword(newPass, salt);
+    await logAudit('password_reset', authSession.username, username);
+  }
+  await saveUsers(users);
+  renderUserManagement();
+}
+
+/* ============================= SESSION DATA EXPORT/IMPORT ============================= */
+/* Purely additive: walks the same storage keys every other part of the app
+   already reads/writes (teams, weeks, weekdata, targets, weights, actioned,
+   coachnotes) via the existing sget/sset helpers, so it stays correct
+   automatically if those areas ever gain new per-team/per-week data. Does
+   not alter how any existing feature stores or reads its own data. */
+async function collectAllData(){
+  const teamsList = await sget('teams') || state.teams || [];
+  const out = { formatVersion: 1, exportedAt: new Date().toISOString(), teamsList, teams:{} };
+  for(const team of teamsList){
+    const weeks = await sget('weeks:'+team) || [];
+    const targets = await sget('targets:'+team) || DEFAULT_TARGETS;
+    const weights = await sget('weights:'+team) || DEFAULT_WEIGHTS;
+    const teamObj = { weeks, targets, weights, weekdata:{}, actioned:{}, coachnotes:{} };
+    for(const w of weeks){
+      const wd = await sget('weekdata:'+team+':'+w.id) || [];
+      teamObj.weekdata[w.id] = wd;
+      teamObj.actioned[w.id] = await sget('actioned:'+team+':'+w.id) || {};
+      const notesForWeek = {};
+      for(const a of wd){
+        const n = await sget('coachnotes:'+team+':'+w.id+':'+a.name);
+        if(n) notesForWeek[a.name] = n;
+      }
+      teamObj.coachnotes[w.id] = notesForWeek;
+    }
+    out.teams[team] = teamObj;
+  }
+  out.authUsers = await getUsers();
+  out.authAuditLog = await getAuditLog();
+  return out;
+}
+async function restoreAllData(data){
+  if(!data || !Array.isArray(data.teamsList) || typeof data.teams!=='object'){
+    throw new Error('That doesn\'t look like a valid export from this console.');
+  }
+  await sset('teams', data.teamsList);
+  for(const team of data.teamsList){
+    const t = data.teams[team]; if(!t) continue;
+    await sset('weeks:'+team, t.weeks||[]);
+    await sset('targets:'+team, t.targets||DEFAULT_TARGETS);
+    await sset('weights:'+team, t.weights||DEFAULT_WEIGHTS);
+    for(const w of (t.weeks||[])){
+      await sset('weekdata:'+team+':'+w.id, (t.weekdata&&t.weekdata[w.id])||[]);
+      await sset('actioned:'+team+':'+w.id, (t.actioned&&t.actioned[w.id])||{});
+      const notesForWeek = (t.coachnotes&&t.coachnotes[w.id])||{};
+      for(const agentName in notesForWeek){
+        await sset('coachnotes:'+team+':'+w.id+':'+agentName, notesForWeek[agentName]);
+      }
+    }
+  }
+  if(Array.isArray(data.authUsers)) await saveUsers(data.authUsers);
+  if(Array.isArray(data.authAuditLog)) await sset('auth:auditlog', data.authAuditLog);
+}
+function ioSetMsg(text, ok){
+  const el = document.getElementById('ioMsg');
+  if(!el) return;
+  el.textContent = text;
+  el.style.color = ok? 'var(--green)' : 'var(--coral)';
+}
+async function ioDoExport(){
+  const data = await collectAllData();
+  const json = JSON.stringify(data);
+  document.getElementById('ioExportText').value = json;
+  return json;
+}
+function ioDownload(json){
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ops-console-state-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+async function ioDoImport(json){
+  let data;
+  try{ data = JSON.parse(json); }
+  catch(e){ ioSetMsg('Could not read that as JSON.', false); return; }
+  try{
+    await restoreAllData(data);
+    await loadAll();
+    renderTopbar();
+    showView(document.querySelector('nav button.active')?.dataset.view || 'home');
+    ioSetMsg('Data restored.', true);
+  }catch(e){ ioSetMsg(e.message || 'Import failed.', false); }
+}
+
+/* ============================= EVENTS ============================= */
+document.querySelectorAll('nav button[data-view]').forEach(b=>{
+  b.addEventListener('click', ()=>showView(b.dataset.view));
+});
+document.getElementById('gotoImportBtn').addEventListener('click', ()=>showView('import'));
+document.getElementById('teamSelect').addEventListener('change', async e=>{
+  await loadTeam(e.target.value);
+  renderTopbar();
+  showView('home');
+});
+document.getElementById('weekSelect').addEventListener('change', async e=>{
+  state.weekId = e.target.value;
+  await loadWeekData();
+  const actioned = await sget('actioned:'+state.team+':'+state.weekId);
+  state.actioned = actioned || {};
+  renderTopbar();
+  showView(document.querySelector('nav button.active')?.dataset.view || 'home');
+});
+document.getElementById('addTeamBtn').addEventListener('click', async ()=>{
+  const name = prompt('New team name:');
+  if(!name) return;
+  if(state.teams.includes(name)){ alert('Team already exists.'); return; }
+  state.teams.push(name);
+  await sset('teams', state.teams);
+  await loadTeam(name);
+  renderTopbar();
+  showView('home');
+});
+
+/* ============================= BOOT ============================= */
+/* ============================= BOOT ============================= */
+document.getElementById('ioFab').addEventListener('click', ()=>{
+  document.getElementById('ioPanel').classList.toggle('open');
+});
+document.getElementById('ioClose').addEventListener('click', ()=>{
+  document.getElementById('ioPanel').classList.remove('open');
+});
+document.getElementById('ioDownloadBtn').addEventListener('click', async ()=>{
+  const json = await ioDoExport();
+  ioDownload(json);
+  ioSetMsg('Downloaded.', true);
+});
+document.getElementById('ioCopyBtn').addEventListener('click', async ()=>{
+  const json = await ioDoExport();
+  try{ await navigator.clipboard.writeText(json); ioSetMsg('Copied to clipboard.', true); }
+  catch(e){ ioSetMsg('Could not copy automatically — select the text above and copy manually.', false); }
+});
+document.getElementById('ioFileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{ document.getElementById('ioImportText').value = reader.result; };
+  reader.readAsText(file);
+});
+document.getElementById('ioRestoreBtn').addEventListener('click', ()=>{
+  const json = document.getElementById('ioImportText').value.trim();
+  if(!json){ ioSetMsg('Paste an exported code or choose a file first.', false); return; }
+  if(!confirm('This replaces current data for any team/week found in the imported file. Continue?')) return;
+  ioDoImport(json);
+});
+
+document.getElementById('signOutBtn').addEventListener('click', ()=>doLogout('manual'));
+document.getElementById('authSubmit').addEventListener('click', async ()=>{
+  const user = document.getElementById('authUser').value;
+  const pass = document.getElementById('authPass').value;
+  const err = document.getElementById('authErr');
+  err.textContent = '';
+  const mode = await _detectStorage();
+  if(mode!=='remote') await ensureSeedAdmin();
+  const result = await doLogin(user, pass);
+  if(result){ err.textContent = result; return; }
+  document.getElementById('authOverlay').classList.add('hidden');
+  await loadAll(); // re-fetch with the now-valid session/token before showing data
+  renderTopbar();
+  applyRoleRestrictions();
+  showView('home');
+});
+document.getElementById('authPass').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter') document.getElementById('authSubmit').click();
+});
+
+async function boot(){
+  const content = document.getElementById('content');
+  content.innerHTML = VIEWS.map(v=>`<div class="view" id="view-${v}"></div>`).join('');
+  await ensureSeedAdmin();
+  await loadAll();
+  renderTopbar();
+  showView('home');
+}
+boot();
+</script>
+</body>
+</html>
